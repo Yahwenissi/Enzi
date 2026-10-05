@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Enzi
 
-## Getting Started
+Location-aware discovery platform for Addis Ababa spots. Browse nearby parks, museums, game zones, galleries, and hidden gems on an interactive map.
 
-First, run the development server:
+## Stack
+
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · MapLibre GL · Tailwind CSS v4
+
+## Getting started
+
+Requires Node.js >= 22.12.0 (see `.nvmrc`).
 
 ```bash
+npm install
+cp .env.example .env.local   # then add your Gebeta token
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_GEBETA_ACCESS_TOKEN` | yes | Gebeta Maps access token. Browser-exposed, so scope it accordingly. The map page renders a fallback notice without it. |
 
-## Learn More
+`.env` and `.env*.local` are gitignored. Never commit real tokens.
 
-To learn more about Next.js, take a look at the following resources:
+## Commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Dev server on port 3000 |
+| `npm run build` | Production build (includes type checking) |
+| `npm run start` | Serve the production build |
+| `npm run lint` | ESLint |
+| `npx tsc --noEmit` | Standalone type check |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Routes
 
-## Deploy on Vercel
+- `/` — landing page, category links into `/map?category=<key>`
+- `/map` — map explorer with search, category filters, and a spot list
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Status
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Spot data, geocoding, and directions are mocked pending a backend. Spot detail pages, profiles, and bookings are not built yet.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

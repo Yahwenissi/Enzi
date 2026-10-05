@@ -1,0 +1,358 @@
+BACKEND STRUCTURE SPECIFICATION - ENZI
+======================================
+
+This document outlines the data layer and backend structure for the Enzi project.
+It is structured to allow a backend developer to implement Prisma models, APIs,
+auth, and database seed data independently of the frontend.
+
+=== 1. DATABASE SCHEMA (prisma/schema.prisma) ===
+
+// Core models for better-auth + Enzi domain
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  role          Role      @default(USER)
+  level         Int       @default(1)
+  xp            Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // better-auth relations
+  accounts      Account[]
+  sessions      Session[]
+  verifications Verification[]
+
+  // Enzi domain
+  spots         Spot[]
+  bookings      Booking[]
+  reviews       Review[]
+  badges        UserBadge[]
+  visits        Visit[]
+}
+
+model Spot {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId  String
+  address     String
+  latitude    Float    // WGS84 for gebeta
+  longitude   Float
+  phone       String?
+  website     String?
+  hours       Json?    // { mon: "9-22", tue: "9-22", ... }
+  images      String[]
+  rating      Float    @default(0)
+  reviewCount Int      @default(0)
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator     User     @relation(fields: [creatorId], references: [id])
+  creatorId   String
+  bookings    Booking[]
+  reviews     Review[]
+  visits      Visit[]
+}
+
+model Category {
+  id          String @id @default(cuid())
+  name        String @unique
+  slug        String @unique
+  icon        String // lucide icon name
+  color       String // tailwind color class
+  description String?
+  spots       Spot[]
+}
+
+model Booking {
+  id        String       @id @default(cuid())
+  user      User         @relation(fields: [userId], references: [id])
+  userId    String
+  spot      Spot         @relation(fields: [spotId], references: [id])
+  spotId    String
+  status    BookingStatus @default(PENDING)
+  date      DateTime
+  partySize Int
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  spot      Spot     @relation(fields: [spotId], references: [id])
+  spotId    String
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Badge {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  icon        String
+  criteria    Json   // { type: "VISITS", count: 10, categoryId?: "parks" }
+  users       UserBadge[]
+}
+
+model UserBadge {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  badge  Badge  @relation(fields: [badgeId], references: [id])
+  badgeId String
+  earnedAt DateTime @default(now())
+  @@unique([userId, badgeId])
+}
+
+model Visit {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  spot   Spot   @relation(fields: [spotId], references: [id])
+  spotId String
+  visitedAt DateTime @default(now())
+  @@unique([userId, spotId])
+}
+
+// better-auth required models
+
+model Account {
+  id                String  @id @default(cuid())
+  accountId         String
+  providerId        String
+  userId            String
+  accessToken       String?
+  refreshToken      String?
+  idToken           String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope             String?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([providerId, accountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  expiresAt    DateTime
+  token        String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  ipAddress    String?
+  userAgent    String?
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id        String   @id @default(cuid())
+  identifier String
+  value     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([identifier, value])
+}
+
+enum Role { USER ADMIN MODERATOR }
+enum Category { FOOD PARKS MUSEUMS GAME_ZONES GALLERIES HIDDEN_GEMS }
+enum BookingStatus { PENDING CONFIRMED CANCELLED COMPLETED }
+
+// === 2. BETTER-AUTH CONFIG (lib/auth.ts) ===
+
+// Import better-auth and prisma adapter
+// Configure with:
+// - emailAndPassword enabled
+// - telegram social provider
+// - nextCookies plugin for cookie handling
+// - Database: prismaAdapter(prisma, { provider: "postgresql" })
+
+// === 3. AUTH API ROUTE (app/api/auth/[...all]/route.ts) ===
+
+import { auth } from "@/lib/auth"
+import { toNextJsHandler } from "better-auth/next-js"
+
+export const { GET, POST } = toNextJsHandler(auth)
+
+// === 4. AUTH CLIENT (lib/auth-client.ts) ===
+
+import { createAuthClient } from "better-auth/react"
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_APP_URL,
+})
+
+// === 5. PROVIDERS WRAPPER (components/providers.tsx) ===
+
+"use client"
+import { SessionProvider } from "better-auth/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { useState, type ReactNode } from "react"
+
+export function Providers({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: { queries: { staleTime: 5000 } }
+  }))
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>{children}</SessionProvider>
+    </QueryClientProvider>
+  )
+}
+
+// === 6. ENVIRONMENT VARIABLES (.env) ===
+
+DATABASE_URL="postgresql://..."
+BETTER_AUTH_SECRET="..."
+BETTER_AUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+TELEGRAM_BOT_ID="..."
+TELEGRAM_BOT_TOKEN="..."
+GEBETA_ACCESS_TOKEN="..."
+GEBETA_REFRESH_TOKEN="..."
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+// === 7. GEBETA MAPS INTEGRATION ===
+
+// Gebeta Maps setup (client-side)
+// - @gebeta/react for MapLibre-based UI component
+// - gebeta-maps wrapper for geocoding, directions, routing, search
+// - Access tokens from gebeta.app dashboard
+
+// Core gebeta client (lib/gebeta.ts):
+import { GebetaMaps } from "@gebeta/js"
+import { GebetaMap } from "@gebeta/react"
+import { geocoding, directions, matrix, oneToMany, optimizeRoute } from "gebeta-maps"
+
+export const gebetaMap = new GebetaMaps({
+  auth: { accessToken: process.env.GEBETA_ACCESS_TOKEN }
+})
+
+// Geocoding request example:
+// const geo = await geocoding("Bole, Addis Ababa", process.env.GEBETA_ACCESS_TOKEN!)
+
+// Directions request example:
+// const dir = await directions({
+//   origin: [lat1, lng1],
+//   destination: [lat2, lng2],
+//   apiKey: process.env.GEBETA_ACCESS_TOKEN
+// })
+
+// === 8. DATA SEEDING (prisma/seed.ts) ===
+
+// Seed 50+ real Addis Ababa spots across categories
+// Use gebeta-maps geocoding to verify coordinates
+// Include: name, description, category, address, lat/lng, phone, website, hours, images, rating
+
+// Categories with example data:
+// - PARKS: Entoto Natural Park, Bihere Tsion, etc.
+// - MUSEUMS: National Museum, Ethnographic Museum, etc.
+// - GAME_ZONES: Various gaming/entertainment spots
+// - GALLERIES: Ubject, Zoma, etc.
+// - HIDDEN_GEMS: Local hidden spots
+
+// === 9. API ROUTES TO IMPLEMENT ===
+
+// GET /api/spots - List all spots with pagination, category filter
+// GET /api/spots/[id] - Get single spot detail
+// GET /api/categories - List all categories
+// POST /api/bookings - Create new booking (auth required)
+// GET /api/bookings - User's bookings (auth required)
+// GET /api/reviews - Spot reviews with pagination
+// POST /api/reviews - Create review (auth required)
+// GET /api/user/profile - User profile with level, xp, badges (auth required)
+// GET /api/badges - Available badges progress
+
+// === 10. PRISMA QUERIES EXAMPLES ===
+
+// Get spots with pagination and filter
+const spots = await prisma.spot.findMany({
+  where: {
+    category: categoryId,
+    isVerified: true
+  },
+  include: {
+    creator: { select: { name: true, image: true } },
+    _count: { select: { bookings: true, reviews: true, visits: true } }
+  },
+  take: limit,
+  skip: (page - 1) * limit
+})
+
+// Get user profile with stats
+const user = await prisma.user.findUnique({
+  where: { id: userId },
+  include: {
+    spots: true,
+    bookings: { where: { status: "COMPLETED" } },
+    reviews: true,
+    UserBadge: { include: { badge: true } }
+  }
+})
+
+// === 11. TYPE SAFETY NOTES ===
+
+// All Prisma models generate TypeScript types automatically
+// better-auth types: BetterAuth, Session, User, etc.
+// gebeta-maps types: DirectionRequest, DirectionResponse, GeocodingRequest, etc.
+// Keep Prisma schema in sync: npx prisma generate
+
+// === 12. DATABASE MIGRATION WORKFLOW ===
+
+// 1. Add model to schema.prisma
+// 2. npx prisma migrate make <migration_name>
+// 3. Run migration: npx prisma migrate deploy
+// 4. Generate types: npx prisma generate
+// 5. Update API routes as needed
+
+// === 13. SEED DATA COMMANDS ===
+
+// npx prisma db seed
+// Or run via: npm run seed (if script defined in package.json)
+
+// === 14. ADDITIONAL NOTES ===
+
+// - Use Prisma Postgres, Neon, or Supabase for production
+// - better-auth adapter works with any PostgreSQL-compatible DB
+// - Consider connection pooling for production
+// - Add indexes on frequently queried fields (email, categoryId, latitude/longitude)
+// - Enable RLS (Row Level Security) for production
+// - Backup strategy for production database
+
+// === 15. FRONTEND CONSUMPTION PATTERNS ===
+
+// User profile (with auth client):
+// const { data: user, session } = await authClient.api.getUser.query()
+// Or: const user = await auth.api.getUser({ headers })
+
+// Spot list (server component):
+// const spots = await fetcher(`/api/spots?category=parks`)
+
+// Booking creation:
+// await auth.api.createBooking({
+//   body: { spotId, date, partySize },
+//   headers
+// })
+
+// Map initialization:
+// <GebetaMap auth={authState} style={{width: '100%', height: '400px'}} />
+
+// Geocoding:
+// const result = await geocodingService(query)
+
+// Directions:
+// const route = await directionsService(origin, destination)

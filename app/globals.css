@@ -1,18 +1,27 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-clay: #fff5e8;
+  --color-charcoal: #30231e;
+  --color-orange: #d96142;
+  --color-darkorange: #a9432d;
+  --color-green: #78b84a;
+  --color-purple: #8250b4;
+  --color-cyan: #55b9c8;
+  --color-pink: #d95e86;
+  --color-gold: #ddaa45;
+  --color-subtle: #f0efeb;
+
+  --font-display: var(--font-fredoka), "Baloo 2", system-ui, sans-serif;
+  --font-body: var(--font-nunito), system-ui, sans-serif;
+
+  --radius-btn: 9999px;
+}
 
 @layer base {
   :root {
-    --background: #FFF5E8;
-    --foreground: #30231E;
-  }
-
-  @theme inline {
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --font-display: "Fredoka", "Baloo 2", system-ui, sans-serif;
-    --font-body: "Nunito", system-ui, sans-serif;
+    --background: var(--color-clay);
+    --foreground: var(--color-charcoal);
   }
 
   body {
