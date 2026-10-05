@@ -1,8 +1,16 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Map, NavigationControl } from "maplibre-gl"
+import {
+  GPUInitializationError,
+  Map,
+  NavigationControl,
+  getVersion,
+  setWorkerUrl,
+} from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
+
+setWorkerUrl(`/maplibre/${getVersion()}/maplibre-gl-worker.mjs`)
 
 export interface GebetaMapProps {
   accessToken: string
@@ -36,39 +44,51 @@ export function GebetaMap({
       return
     }
 
-    const map = new Map({
-      container: containerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            attribution: "© OpenStreetMap contributors",
-            maxzoom: 19,
+    let map: Map
+    try {
+      map = new Map({
+        container: containerRef.current,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: "raster",
+              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+              tileSize: 256,
+              attribution: "© OpenStreetMap contributors",
+              maxzoom: 19,
+            },
           },
+          layers: [
+            {
+              id: "osm",
+              type: "raster",
+              source: "osm",
+              minzoom: 0,
+              maxzoom: 19,
+            },
+          ],
         },
-        layers: [
-          {
-            id: "osm",
-            type: "raster",
-            source: "osm",
-            minzoom: 0,
-            maxzoom: 19,
-          },
-        ],
-      },
-      center,
-      zoom,
-      attributionControl: false,
-    })
+        center,
+        zoom,
+        attributionControl: false,
+      })
+    } catch (error) {
+      const message =
+        error instanceof GPUInitializationError
+          ? "This browser does not support WebGL2, which MapLibre requires."
+          : `Map failed to start: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+      queueMicrotask(() => setMapError(message))
+      return
+    }
 
     map.addControl(new NavigationControl(), "top-right")
     mapRef.current = map
 
     map.on("error", (e) => {
-      const errMsg = e.error?.message ?? e.message
+      const errMsg = e.error?.message
       if (errMsg) {
         console.error("[GebetaMap] MapLibre error:", errMsg)
         setMapError(`Map error: ${errMsg}`)
@@ -80,7 +100,7 @@ export function GebetaMap({
     })
 
     return () => {
-      map.remove()
+      mapRef.current?.remove()
       mapRef.current = null
     }
     // center/zoom are applied imperatively below so that parent re-renders
