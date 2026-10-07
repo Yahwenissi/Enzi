@@ -3,28 +3,18 @@
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Star, TreePine, Building, Gamepad2, Palette, Gem, MapPin } from "lucide-react"
+import { Star, MapPin } from "lucide-react"
 import { GebetaMap } from "@/components/map/GebetaMap"
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  SPOTS,
+  type Spot,
+  type SpotCategory,
+} from "@/lib/spots"
 
-export type SpotCategory =
-  | "parks"
-  | "museums"
-  | "game-zones"
-  | "galleries"
-  | "hidden-gems"
-
-export interface Spot {
-  id: string
-  name: string
-  category: SpotCategory
-  latitude: number
-  longitude: number
-  address: string
-  description: string
-  image?: string
-  rating: number
-  reviewCount: number
-}
+export { type SpotCategory }
+export type { Spot } from "@/lib/spots"
 
 interface DirectionStep {
   instruction: string
@@ -42,136 +32,6 @@ interface Directions {
 
 const ADDIS_CENTER: [number, number] = [38.7685, 9.0161]
 
-const categories: { key: SpotCategory; label: string; icon: typeof TreePine; count: number }[] = [
-  { key: "parks", label: "Parks", icon: TreePine, count: 12 },
-  { key: "museums", label: "Museums", icon: Building, count: 8 },
-  { key: "game-zones", label: "Game Zones", icon: Gamepad2, count: 15 },
-  { key: "galleries", label: "Galleries", icon: Palette, count: 6 },
-  { key: "hidden-gems", label: "Hidden Gems", icon: Gem, count: 20 },
-]
-
-const categoryLabels: Record<SpotCategory, string> = {
-  parks: "Parks",
-  museums: "Museums",
-  "game-zones": "Game Zones",
-  galleries: "Galleries",
-  "hidden-gems": "Hidden Gems",
-}
-
-// Mock spot data for development (replace with real API data when backend is ready)
-const mockSpots: Spot[] = [
-  {
-    id: "1",
-    name: "Entoto Natural Park",
-    category: "parks",
-    latitude: 9.0667,
-    longitude: 38.75,
-    address: "Entoto, Addis Ababa",
-    description: "Beautiful natural park with hiking trails and city views",
-    rating: 4.5,
-    reviewCount: 128,
-  },
-  {
-    id: "2",
-    name: "National Museum of Ethiopia",
-    category: "museums",
-    latitude: 9.0333,
-    longitude: 38.75,
-    address: "King George VI St, Addis Ababa",
-    description: "Home to Lucy, the famous 3.2 million-year-old hominid fossil",
-    rating: 4.3,
-    reviewCount: 89,
-  },
-  {
-    id: "3",
-    name: "Entoto Maryam Church",
-    category: "hidden-gems",
-    latitude: 9.0833,
-    longitude: 38.7667,
-    address: "Entoto Mountain, Addis Ababa",
-    description: "Historic church with panoramic city views",
-    rating: 4.7,
-    reviewCount: 45,
-  },
-  {
-    id: "4",
-    name: "Meskel Square",
-    category: "parks",
-    latitude: 9.0167,
-    longitude: 38.75,
-    address: "Meskel Square, Addis Ababa",
-    description: "Iconic public square for festivals and gatherings",
-    rating: 4.2,
-    reviewCount: 67,
-  },
-  {
-    id: "5",
-    name: "Addis Ababa Museum",
-    category: "museums",
-    latitude: 9.02,
-    longitude: 38.74,
-    address: "Meskel Square Area, Addis Ababa",
-    description: "Museum showcasing the history of Addis Ababa",
-    rating: 4.0,
-    reviewCount: 34,
-  },
-  {
-    id: "6",
-    name: "Sheger Park",
-    category: "parks",
-    latitude: 9.01,
-    longitude: 38.76,
-    address: "Bole, Addis Ababa",
-    description: "Modern urban park with recreational facilities",
-    rating: 4.4,
-    reviewCount: 156,
-  },
-  {
-    id: "7",
-    name: "Lions Park",
-    category: "game-zones",
-    latitude: 9.03,
-    longitude: 38.74,
-    address: "Lideta, Addis Ababa",
-    description: "Entertainment park with games and activities",
-    rating: 4.1,
-    reviewCount: 78,
-  },
-  {
-    id: "8",
-    name: "Gurd Sholla Park",
-    category: "parks",
-    latitude: 8.99,
-    longitude: 38.78,
-    address: "Bole, Addis Ababa",
-    description: "Park near the airport with walking paths",
-    rating: 3.9,
-    reviewCount: 23,
-  },
-  {
-    id: "9",
-    name: "Yeka Park",
-    category: "parks",
-    latitude: 9.05,
-    longitude: 38.8,
-    address: "Yeka, Addis Ababa",
-    description: "Neighborhood park with playgrounds",
-    rating: 3.8,
-    reviewCount: 12,
-  },
-  {
-    id: "10",
-    name: "Addis Fine Art Gallery",
-    category: "galleries",
-    latitude: 9.02,
-    longitude: 38.75,
-    address: "Bole, Addis Ababa",
-    description: "Contemporary Ethiopian art gallery",
-    rating: 4.6,
-    reviewCount: 28,
-  },
-]
-
 function estimateDirections(
   origin: [number, number],
   spot: Spot
@@ -181,8 +41,8 @@ function estimateDirections(
     Math.sqrt(
       Math.pow(destination[0] - origin[0], 2) +
         Math.pow(destination[1] - origin[1], 2)
-    ) * 111 // rough km conversion
-  const duration = distance * 2 // rough minutes estimate
+    ) * 111
+  const duration = distance * 2
 
   return {
     origin,
@@ -218,7 +78,7 @@ export function MapExplorer({
     if (query.length < 3) {
       return []
     }
-    return mockSpots.filter(
+    return SPOTS.filter(
       (spot) =>
         spot.name.toLowerCase().includes(query) ||
         spot.address.toLowerCase().includes(query) ||
@@ -229,8 +89,8 @@ export function MapExplorer({
   const visibleSpots = useMemo(
     () =>
       activeCategory
-        ? mockSpots.filter((spot) => spot.category === activeCategory)
-        : mockSpots,
+        ? SPOTS.filter((spot) => spot.category === activeCategory)
+        : SPOTS,
     [activeCategory]
   )
 
@@ -262,6 +122,8 @@ export function MapExplorer({
     setSearchQuery("")
   }
 
+  const imageUrl = selectedSpot?.images?.[0]?.url
+
   return (
     <div className="flex min-h-screen flex-col bg-clay">
       <header className="relative z-10 flex items-center justify-between border-b border-charcoal/10 px-6 py-4">
@@ -284,7 +146,7 @@ export function MapExplorer({
               onClick={() => setActiveCategory(null)}
               className="relative inline-flex items-center gap-1.5 rounded-btn border-2 border-orange bg-orange/10 px-4 py-1.5 text-sm text-orange transition-colors hover:bg-orange/20"
             >
-              {categoryLabels[activeCategory]} ✕
+              {CATEGORY_LABELS[activeCategory]} ✕
             </button>
           )}
           <button
@@ -300,9 +162,11 @@ export function MapExplorer({
       <main className="relative flex flex-1 flex-col md:flex-row">
         <div className="relative h-[500px] w-full md:h-auto md:flex-1">
           <GebetaMap
-            accessToken={process.env.NEXT_PUBLIC_GEBETA_ACCESS_TOKEN ?? ""}
+            spots={visibleSpots}
             center={center}
             zoom={zoom}
+            selectedSpotId={selectedSpot?.id ?? null}
+            onSpotSelect={setSelectedSpot}
           />
 
           {showSearchResults && (
@@ -322,7 +186,7 @@ export function MapExplorer({
                     {spot.name}
                   </span>
                   <span className="line-clamp-1 text-sm text-orange">
-                    {categoryLabels[spot.category]}
+                    {CATEGORY_LABELS[spot.category]}
                   </span>
                   <span className="line-clamp-1 text-xs text-charcoal/60">
                     {spot.address}
@@ -363,13 +227,14 @@ export function MapExplorer({
           {selectedSpot && (
             <div className="absolute bottom-6 left-1/2 z-20 w-full max-w-md -translate-x-1/2 rounded-xl border border-charcoal/10 bg-white p-6 shadow-xl">
               <div className="mb-3 flex items-start gap-3">
-                {selectedSpot.image ? (
+                {imageUrl ? (
                   <Image
-                    src={selectedSpot.image}
+                    src={imageUrl}
                     alt={selectedSpot.name}
                     width={120}
                     height={80}
                     className="h-20 w-30 shrink-0 rounded object-cover"
+                    unoptimized
                   />
                 ) : (
                   <div
@@ -383,7 +248,7 @@ export function MapExplorer({
                   </h3>
                   <p className="text-sm text-charcoal/60">{selectedSpot.address}</p>
                   <p className="mt-1 text-sm text-orange">
-                    {categoryLabels[selectedSpot.category]}
+                    {CATEGORY_LABELS[selectedSpot.category]}
                   </p>
                   <div className="mt-1 flex items-center gap-2 text-charcoal/80">
                     <Star className="h-3 w-3 text-orange/60" />
@@ -396,18 +261,26 @@ export function MapExplorer({
               <p className="mb-3 text-sm text-charcoal/70">
                 {selectedSpot.description}
               </p>
-              <button
-                type="button"
-                onClick={() => setSelectedSpot(null)}
-                className="w-full rounded-btn bg-orange py-3 font-display font-bold text-white shadow-[0_4px_0_0_rgba(169,67,45,0.9)] transition-all hover:shadow-[0_6px_0_0_rgba(169,67,45,0.9)]"
-              >
-                Close
-              </button>
+              <div className="flex gap-2">
+                <Link
+                  href={`/spots/${selectedSpot.id}`}
+                  className="flex-1 rounded-btn border-2 border-orange/40 py-2 text-center font-display font-bold text-orange transition-colors hover:bg-orange/10"
+                >
+                  View details
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSpot(null)}
+                  className="flex-1 rounded-btn bg-orange py-2 font-display font-bold text-white shadow-[0_4px_0_0_rgba(169,67,45,0.9)] transition-all hover:shadow-[0_6px_0_0_rgba(169,67,45,0.9)]"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           )}
 
           <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-2">
-            {categories.map((cat) => {
+            {CATEGORIES.map((cat) => {
               const Icon = cat.icon
               const isActive = activeCategory === cat.key
               return (
